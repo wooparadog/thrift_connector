@@ -159,6 +159,10 @@ class ThriftClient(ThriftBaseClient):
     def set_timeout(cls, socket, timeout):
         socket.setTimeout(timeout)
 
+    @classmethod
+    def get_timeout(cls, socket):
+        return socket._timeout
+
 
 class ThriftPyBaseClient(ThriftBaseClient):
     def init_client(self, client):
@@ -189,6 +193,10 @@ class ThriftPyBaseClient(ThriftBaseClient):
     @classmethod
     def set_timeout(cls, socket, timeout):
         socket.set_timeout(timeout)
+
+    @classmethod
+    def get_timeout(cls, socket):
+        return socket.socket_timeout
 
 
 class ThriftPyClient(ThriftPyBaseClient):
@@ -330,17 +338,20 @@ class BaseClientPool(object):
     @contextlib.contextmanager
     def connection_ctx(self, timeout=None):
         client = self.get_client()
+        _socket = client.get_socket_factory()
         if timeout is not None:
-            client.set_timeout(timeout)
+            client.set_timeout(timeout, _socket)
         try:
             yield client
-            client.set_timeout(self.timeout)
+            if self.timeout != client.get_timeout(_socket):
+                client.set_timeout(self.timeout, _socket)
             self.put_back_connection(client)
         except client.TTransportException:
             client.close()
             raise
         except Exception:
-            client.set_timeout(self.timeout)
+            if self.timeout != client.get_timeout(_socket):
+                client.set_timeout(self.timeout)
             self.put_back_connection(client)
             raise
 
