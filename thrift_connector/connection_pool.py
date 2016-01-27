@@ -351,7 +351,7 @@ class BaseClientPool(object):
             raise
         except Exception:
             if self.timeout != client.get_timeout(_socket):
-                client.set_timeout(self.timeout)
+                client.set_timeout(self.timeout, _socket)
             self.put_back_connection(client)
             raise
 
