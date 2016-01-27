@@ -328,15 +328,19 @@ class BaseClientPool(object):
         return call
 
     @contextlib.contextmanager
-    def connection_ctx(self):
+    def connection_ctx(self, timeout=None):
         client = self.get_client()
+        if timeout is not None:
+            client.set_timeout(timeout)
         try:
             yield client
+            client.set_timeout(self.timeout)
             self.put_back_connection(client)
         except client.TTransportException:
             client.close()
             raise
         except Exception:
+            client.set_timeout(self.timeout)
             self.put_back_connection(client)
             raise
 
