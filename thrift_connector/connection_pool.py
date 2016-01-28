@@ -196,7 +196,7 @@ class ThriftPyBaseClient(ThriftBaseClient):
 
     @classmethod
     def get_timeout(cls, socket):
-        return socket.socket_timeout
+        return socket._timeout
 
 
 class ThriftPyClient(ThriftPyBaseClient):
@@ -343,7 +343,7 @@ class BaseClientPool(object):
         client = self.get_client()
         _socket = client.get_socket_factory()(self.host, self.port)
         if timeout is not None:
-            client.set_timeout(_socket, timeout)
+            client.set_timeout(_socket, timeout * 1000)
         try:
             yield client
             self.put_back_connection(client, _socket)
