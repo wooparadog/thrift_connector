@@ -292,10 +292,13 @@ class BaseClientPool(object):
         except KeyError:
             return None
 
-    def put_back_connection(self, conn):
+    def put_back_connection(self, conn, socket=None):
         assert isinstance(conn, ThriftBaseClient)
         if self.max_conn > 0 and len(self.connections) < self.max_conn and\
                 conn.pool_generation == self.generation:
+            if socket is not None:
+                if self.timeout != conn.get_timeout(socket):
+                    conn.set_timeout(socket, self.timeout)
             self.connections.add(conn)
             return True
         else:
@@ -318,7 +321,7 @@ class BaseClientPool(object):
             tracking=self.tracking,
             tracker_factory=self.tracker_factory,
             pool=self
-            )
+        )
 
     def get_client(self):
         return self.get_client_from_pool() or self.produce_client()
@@ -338,21 +341,17 @@ class BaseClientPool(object):
     @contextlib.contextmanager
     def connection_ctx(self, timeout=None):
         client = self.get_client()
-        _socket = client.get_socket_factory()
+        _socket = client.get_socket_factory()(self.host, self.port)
         if timeout is not None:
-            client.set_timeout(timeout, _socket)
+            client.set_timeout(_socket, timeout)
         try:
             yield client
-            if self.timeout != client.get_timeout(_socket):
-                client.set_timeout(self.timeout, _socket)
-            self.put_back_connection(client)
+            self.put_back_connection(client, _socket)
         except client.TTransportException:
             client.close()
             raise
         except Exception:
-            if self.timeout != client.get_timeout(_socket):
-                client.set_timeout(self.timeout, _socket)
-            self.put_back_connection(client)
+            self.put_back_connection(client, _socket)
             raise
 
     @contextlib.contextmanager
