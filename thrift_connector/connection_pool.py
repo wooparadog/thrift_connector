@@ -75,6 +75,7 @@ class ThriftBaseClient(object):
                 pool_generation=0, tracking=False, tracker_factory=None,
                 pool=None):
         SOCKET = cls.get_socket_factory()(host, port)
+        cls.set_current_socket(SOCKET)
         cls.set_timeout(SOCKET, timeout * 1000)
         PROTO_FACTORY = cls.get_protoco_factory()
         TRANS_FACTORY = cls.get_transport_factory()
@@ -115,6 +116,13 @@ class ThriftBaseClient(object):
     @classmethod
     def get_socket_factory(self):
         raise NotImplementedError
+
+    @classmethod
+    def set_current_socket(cls, socket):
+        cls.socket = socket
+
+    def get_socket(self):
+        return self.socket
 
     @classmethod
     def set_timeout(cls, socket, timeout):
@@ -298,7 +306,7 @@ class BaseClientPool(object):
                 conn.pool_generation == self.generation:
             if socket is not None:
                 if self.timeout != conn.get_timeout(socket):
-                    conn.set_timeout(socket, self.timeout)
+                    conn.set_timeout(socket, self.timeout * 1000)
             self.connections.add(conn)
             return True
         else:
@@ -341,7 +349,7 @@ class BaseClientPool(object):
     @contextlib.contextmanager
     def connection_ctx(self, timeout=None):
         client = self.get_client()
-        _socket = client.get_socket_factory()(self.host, self.port)
+        _socket = client.get_socket()
         if timeout is not None:
             client.set_timeout(_socket, timeout * 1000)
         try:
