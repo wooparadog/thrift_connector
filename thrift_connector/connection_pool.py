@@ -22,7 +22,7 @@ def validate_host_port(host, port):
 class ThriftBaseClient(object):
     def __init__(self, host, port, transport, protocol, service,
                  keepalive=None, pool_generation=0, tracking=False,
-                 tracker_factory=None, pool=None):
+                 tracker_factory=None, socket=None, pool=None):
         self.host = host
         self.port = port
         self.transport = transport
@@ -33,6 +33,7 @@ class ThriftBaseClient(object):
         self.pool_generation = pool_generation
         self.tracking = tracking
         self.tracker_factory = tracker_factory
+        self.socket = socket
         self.pool = pool
 
         self.client = self.get_tclient(service, protocol)
@@ -75,7 +76,6 @@ class ThriftBaseClient(object):
                 pool_generation=0, tracking=False, tracker_factory=None,
                 pool=None):
         SOCKET = cls.get_socket_factory()(host, port)
-        cls.set_current_socket(SOCKET)
         cls.set_timeout(SOCKET, timeout * 1000)
         PROTO_FACTORY = cls.get_protoco_factory()
         TRANS_FACTORY = cls.get_transport_factory()
@@ -95,6 +95,7 @@ class ThriftBaseClient(object):
             pool_generation=pool_generation,
             tracking=tracking,
             tracker_factory=tracker_factory,
+            socket=SOCKET,
             pool=pool,
             )
 
@@ -116,10 +117,6 @@ class ThriftBaseClient(object):
     @classmethod
     def get_socket_factory(self):
         raise NotImplementedError
-
-    @classmethod
-    def set_current_socket(cls, socket):
-        cls.socket = socket
 
     def get_socket(self):
         return self.socket
