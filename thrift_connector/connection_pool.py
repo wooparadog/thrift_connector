@@ -118,9 +118,6 @@ class ThriftBaseClient(object):
     def get_socket_factory(self):
         raise NotImplementedError
 
-    def get_socket(self):
-        return self.socket
-
     @classmethod
     def set_timeout(cls, socket, timeout):
         raise NotImplementedError
@@ -297,13 +294,12 @@ class BaseClientPool(object):
         except KeyError:
             return None
 
-    def put_back_connection(self, conn, socket=None):
+    def put_back_connection(self, conn):
         assert isinstance(conn, ThriftBaseClient)
         if self.max_conn > 0 and len(self.connections) < self.max_conn and\
                 conn.pool_generation == self.generation:
-            if socket is not None:
-                if self.timeout != conn.get_timeout(socket):
-                    conn.set_timeout(socket, self.timeout * 1000)
+            if self.timeout != conn.get_timeout(conn.socket):
+                conn.set_timeout(conn.socket, self.timeout * 1000)
             self.connections.add(conn)
             return True
         else:
@@ -346,17 +342,16 @@ class BaseClientPool(object):
     @contextlib.contextmanager
     def connection_ctx(self, timeout=None):
         client = self.get_client()
-        _socket = client.get_socket()
         if timeout is not None:
-            client.set_timeout(_socket, timeout * 1000)
+            client.set_timeout(client.socket, timeout * 1000)
         try:
             yield client
-            self.put_back_connection(client, _socket)
+            self.put_back_connection(client)
         except client.TTransportException:
             client.close()
             raise
         except Exception:
-            self.put_back_connection(client, _socket)
+            self.put_back_connection(client)
             raise
 
     @contextlib.contextmanager
