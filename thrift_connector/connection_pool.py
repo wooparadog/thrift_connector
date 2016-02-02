@@ -22,7 +22,7 @@ def validate_host_port(host, port):
 class ThriftBaseClient(object):
     def __init__(self, host, port, transport, protocol, service,
                  keepalive=None, pool_generation=0, tracking=False,
-                 tracker_factory=None, socket=None, pool=None):
+                 tracker_factory=None, pool=None, socket=None):
         self.host = host
         self.port = port
         self.transport = transport
@@ -95,8 +95,8 @@ class ThriftBaseClient(object):
             pool_generation=pool_generation,
             tracking=tracking,
             tracker_factory=tracker_factory,
-            socket=SOCKET,
             pool=pool,
+            socket=SOCKET,
             )
 
     @property
@@ -121,6 +121,9 @@ class ThriftBaseClient(object):
     @classmethod
     def set_timeout(cls, socket, timeout):
         raise NotImplementedError
+
+    def get_timeout(self):
+        return self.socket._timeout
 
 
 class ThriftClient(ThriftBaseClient):
@@ -161,9 +164,8 @@ class ThriftClient(ThriftBaseClient):
     def set_timeout(cls, socket, timeout):
         socket.setTimeout(timeout)
 
-    @classmethod
-    def get_timeout(cls, socket):
-        return socket._timeout
+    def set_client_timeout(self, timeout):
+        self.set_timeout(self.socket, timeout)
 
 
 class ThriftPyBaseClient(ThriftBaseClient):
@@ -195,10 +197,6 @@ class ThriftPyBaseClient(ThriftBaseClient):
     @classmethod
     def set_timeout(cls, socket, timeout):
         socket.set_timeout(timeout)
-
-    @classmethod
-    def get_timeout(cls, socket):
-        return socket._timeout
 
 
 class ThriftPyClient(ThriftPyBaseClient):
@@ -298,8 +296,8 @@ class BaseClientPool(object):
         assert isinstance(conn, ThriftBaseClient)
         if self.max_conn > 0 and len(self.connections) < self.max_conn and\
                 conn.pool_generation == self.generation:
-            if self.timeout != conn.get_timeout(conn.socket):
-                conn.set_timeout(conn.socket, self.timeout * 1000)
+            if self.timeout != conn.get_timeout():
+                conn.set_client_timeout(self.timeout * 1000)
             self.connections.add(conn)
             return True
         else:
@@ -343,7 +341,7 @@ class BaseClientPool(object):
     def connection_ctx(self, timeout=None):
         client = self.get_client()
         if timeout is not None:
-            client.set_timeout(client.socket, timeout * 1000)
+            client.set_client_timeout(timeout * 1000)
         try:
             yield client
             self.put_back_connection(client)
